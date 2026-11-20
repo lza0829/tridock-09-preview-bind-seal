@@ -68,6 +68,7 @@ def list_expects(dock_day: str | None = None):
 def add_expect(body: ExpectIn):
     conn = connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         assert_writable(conn, body.dock_day)
         conn.execute(
             '''INSERT INTO expect_lines(doc_no, supplier_code, sku, dock_day, qty, note, created_at)
@@ -77,8 +78,10 @@ def add_expect(body: ExpectIn):
         conn.commit()
         return {"ok": True}
     except ValueError as e:
+        conn.rollback()
         raise HTTPException(400, str(e)) from e
     except Exception as e:
+        conn.rollback()
         raise HTTPException(400, f"写入失败: {e}") from e
     finally:
         conn.close()
@@ -103,6 +106,7 @@ def list_receives(dock_day: str | None = None):
 def add_receive(body: ReceiveIn):
     conn = connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         assert_writable(conn, body.dock_day)
         occurred = body.occurred_at or _now()
         conn.execute(
@@ -122,8 +126,10 @@ def add_receive(body: ReceiveIn):
         conn.commit()
         return {"ok": True}
     except ValueError as e:
+        conn.rollback()
         raise HTTPException(400, str(e)) from e
     except Exception as e:
+        conn.rollback()
         raise HTTPException(400, f"写入失败: {e}") from e
     finally:
         conn.close()
@@ -148,6 +154,7 @@ def list_confirms(dock_day: str | None = None):
 def add_confirm(body: ConfirmIn):
     conn = connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         assert_writable(conn, body.dock_day)
         conn.execute(
             '''INSERT INTO confirm_lines(confirm_no, supplier_code, sku, dock_day, qty, note, created_at)
@@ -157,8 +164,10 @@ def add_confirm(body: ConfirmIn):
         conn.commit()
         return {"ok": True}
     except ValueError as e:
+        conn.rollback()
         raise HTTPException(400, str(e)) from e
     except Exception as e:
+        conn.rollback()
         raise HTTPException(400, f"写入失败: {e}") from e
     finally:
         conn.close()

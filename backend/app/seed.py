@@ -50,7 +50,15 @@ CREATE TABLE IF NOT EXISTS reconcile_batches (
   variance_count INTEGER NOT NULL,
   status TEXT NOT NULL,
   sealed_at TEXT,
-  note TEXT
+  note TEXT,
+  scanned_rows INTEGER NOT NULL DEFAULT 0,
+  expect_rows INTEGER NOT NULL DEFAULT 0,
+  receive_rows INTEGER NOT NULL DEFAULT 0,
+  confirm_rows INTEGER NOT NULL DEFAULT 0,
+  expect_total REAL NOT NULL DEFAULT 0,
+  receive_total REAL NOT NULL DEFAULT 0,
+  confirm_total REAL NOT NULL DEFAULT 0,
+  created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS match_rows (
   id INTEGER PRIMARY KEY,
@@ -88,10 +96,33 @@ CREATE TABLE IF NOT EXISTS reopen_requests (
 '''
 
 
+# 批快照列：全量重扫架构下，open 批必须快照 scanned_rows 与三腿行数/合计，
+# 供结案闸互证「批 == 当前全量重算」。老库按列补齐，幂等。
+BATCH_SNAPSHOT_COLUMNS = {
+    "scanned_rows": "INTEGER NOT NULL DEFAULT 0",
+    "expect_rows": "INTEGER NOT NULL DEFAULT 0",
+    "receive_rows": "INTEGER NOT NULL DEFAULT 0",
+    "confirm_rows": "INTEGER NOT NULL DEFAULT 0",
+    "expect_total": "REAL NOT NULL DEFAULT 0",
+    "receive_total": "REAL NOT NULL DEFAULT 0",
+    "confirm_total": "REAL NOT NULL DEFAULT 0",
+    "created_at": "TEXT",
+}
+
+
+def migrate(conn) -> None:
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(reconcile_batches)").fetchall()}
+    for name, ddl in BATCH_SNAPSHOT_COLUMNS.items():
+        if name not in cols:
+            conn.execute(f"ALTER TABLE reconcile_batches ADD COLUMN {name} {ddl}")
+    conn.commit()
+
+
 def seed_if_empty() -> None:
     conn = connect()
     try:
         conn.executescript(SCHEMA)
+        migrate(conn)
         if conn.execute("SELECT COUNT(*) c FROM suppliers").fetchone()["c"]:
             return
         conn.execute("INSERT INTO settings(key, value) VALUES ('dock_day', ?)", ("2026-11-18",))

@@ -30,6 +30,17 @@ def run_reconcile(body: RunIn):
         conn.close()
 
 
+@router.post("/reconcile/verify")
+def verify(body: RunIn):
+    conn = connect()
+    try:
+        return svc.verify_day(conn, body.dock_day)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    finally:
+        conn.close()
+
+
 @router.post("/reconcile/seal")
 def seal(body: SealIn):
     conn = connect()

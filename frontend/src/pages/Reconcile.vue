@@ -10,12 +10,17 @@
       <div class="row">
         <input v-model="day" placeholder="到货日" />
         <button @click="run">跑三联对账</button>
+        <button class="secondary" @click="verify">互证校验</button>
         <button class="warn" @click="seal">结案封印</button>
         <button class="secondary" @click="load">刷新</button>
       </div>
       <p class="msg">{{ err }}</p>
       <p class="okmsg">{{ ok }}</p>
       <p v-if="batch">批次 {{ batch.batch_no }} · 对齐 {{ batch.matched_count }} · 差额 {{ batch.variance_count }} · {{ batch.status }}</p>
+      <p v-if="batch">批快照：扫描 {{ batch.scanned_rows }} 行 · 三腿行数 {{ batch.expect_rows }}/{{ batch.receive_rows }}/{{ batch.confirm_rows }} · 三腿合计 {{ batch.expect_total }}/{{ batch.receive_total }}/{{ batch.confirm_total }}</p>
+      <p v-if="verifyResult" class="msg" :style="verifyResult.consistent ? 'color:#2e7d32' : ''">
+        {{ verifyResult.consistent ? '互证一致：批快照 == 当前全量重算' : '互证分叉：' + verifyResult.divergence.join('；') + '，需重跑对账' }}
+      </p>
     </div>
     <div class="panel">
       <h2>对齐行</h2>
@@ -58,6 +63,7 @@ const matches = ref([])
 const variances = ref([])
 const err = ref('')
 const ok = ref('')
+const verifyResult = ref(null)
 async function load() {
   err.value = ''
   const batches = await api(`/reconcile/batches?dock_day=${encodeURIComponent(day.value)}`)
@@ -67,15 +73,21 @@ async function load() {
   variances.value = await api(`/reconcile/variances?batch_id=${batch.value.id}`)
 }
 async function run() {
-  err.value = ''; ok.value = ''
+  err.value = ''; ok.value = ''; verifyResult.value = null
   try {
     batch.value = await api('/reconcile/run', { method: 'POST', body: JSON.stringify({ dock_day: day.value }) })
     ok.value = '对账完成'
     await load()
   } catch (e) { err.value = e.message }
 }
+async function verify() {
+  err.value = ''; ok.value = ''; verifyResult.value = null
+  try {
+    verifyResult.value = await api('/reconcile/verify', { method: 'POST', body: JSON.stringify({ dock_day: day.value }) })
+  } catch (e) { err.value = e.message }
+}
 async function seal() {
-  err.value = ''; ok.value = ''
+  err.value = ''; ok.value = ''; verifyResult.value = null
   try {
     batch.value = await api('/reconcile/seal', { method: 'POST', body: JSON.stringify({ dock_day: day.value }) })
     ok.value = '已结案'
